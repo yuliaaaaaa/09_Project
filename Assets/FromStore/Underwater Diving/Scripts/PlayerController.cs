@@ -1,86 +1,142 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
-public class PlayerController : MonoBehaviour{
+public class PlayerController : MonoBehaviour
+{
+    [Header("Movement")]
+    public float moveSpeed = 4f;
 
-	public float moveSpeed;
-	public bool rushing = false;
-	private float speedMod = 0;
+    [Header("Rush")]
+    public bool rushing = false;
+    public float rushSpeedBonus = 2f;
+    public float rushDuration = 2f;
 
-	float timeLeft = 2f;
+    [Header("Components")]
+    public Rigidbody2D myRigidBody;
+    public Animator myAnim;
 
-	private Rigidbody2D myRigidBody;
+    [Header("Effects")]
+    public GameObject bubbles;
 
-	private Animator myAnim;
+    [Header("Visual")]
+    public float spriteScale = 1.4f;
 
-	public GameObject bubbles;
+    private float horizontalInput;
+    private float verticalInput;
+    private float rushTimeLeft = 0f;
 
-	// Use this for initialization
-	void Start (){
-		myRigidBody = GetComponent<Rigidbody2D> ();	
-		myAnim = GetComponent<Animator> ();
-	}
-	
-	// Update is called once per frame
-	void Update (){
+    private void Start()
+    {
+        if (myRigidBody == null)
+        {
+            myRigidBody = GetComponent<Rigidbody2D>();
+        }
 
-		resetBoostTime ();
-		controllerManager ();
+        if (myAnim == null)
+        {
+            myAnim = GetComponent<Animator>();
+        }
+    }
 
+    private void Update()
+    {
+        ReadInput();
+        HandleRushInput();
+        ResetBoostTime();
+        UpdateFacingDirection();
+        UpdateAnimatorParameters();
+    }
 
+    private void FixedUpdate()
+    {
+        MovePlayer();
+    }
 
-		myAnim.SetFloat ("Speed", Mathf.Abs(myRigidBody.linearVelocity.x));
+    private void ReadInput()
+    {
+        horizontalInput = Input.GetAxisRaw("Horizontal");
+        verticalInput = Input.GetAxisRaw("Vertical");
+    }
 
-	 
-		
-	}
+    private void HandleRushInput()
+    {
+        if (Input.GetButtonDown("Jump") && !rushing)
+        {
+            rushing = true;
+            rushTimeLeft = rushDuration;
 
-	void controllerManager (){
-		if (Input.GetAxisRaw ("Horizontal") > 0f) {
-			transform.localScale = new Vector3(1f,1f,1f);
-			movePlayer ();
-		} else if (Input.GetAxisRaw ("Horizontal") < 0f) {			
-			transform.localScale = new Vector3(-1f,1f,1f);
-			movePlayer ();
-		} else if (Input.GetAxisRaw ("Vertical") > 0f) {
-			myRigidBody.linearVelocity = new Vector3 (myRigidBody.linearVelocity.x, moveSpeed, 0f);
-		} else if (Input.GetAxis ("Vertical") < 0f) {
-			myRigidBody.linearVelocity = new Vector3 (myRigidBody.linearVelocity.x, -moveSpeed, 0f);
-		}
+            // if (bubbles != null)
+            // {
+            //     Instantiate(bubbles, transform.position, transform.rotation);
+            // }
+        }
+    }
 
-		if(Input.GetButtonDown("Jump") && !rushing ){
-			rushing = true;
-			speedMod = 2;
-			Instantiate (bubbles, gameObject.transform.position, gameObject.transform.rotation);
-			movePlayer ();
-		}	
-	}
+    private void MovePlayer()
+    {
+        float currentSpeed = moveSpeed;
 
-	void movePlayer(){
-		if (transform.localScale.x == 1) {
-			myRigidBody.linearVelocity = new Vector3 (moveSpeed + speedMod, myRigidBody.linearVelocity.y, 0f);	
-		} else {
-			myRigidBody.linearVelocity = new Vector3 (- (moveSpeed + speedMod), myRigidBody.linearVelocity.y, 0f);
-		}	
-	}
+        if (rushing)
+        {
+            currentSpeed += rushSpeedBonus;
+        }
 
-	void resetBoostTime(){
-		if (timeLeft <= 0) {
-			timeLeft = 2f;
-			rushing = false;
-			speedMod = 0;
-		} else if(rushing) {
-			timeLeft -= Time.deltaTime;
-		}	
-	}
+        Vector2 moveDirection = new Vector2(horizontalInput, verticalInput).normalized;
+        Vector2 targetVelocity = moveDirection * currentSpeed;
 
-	public void hurt(){
-		if(!rushing){
-			gameObject.GetComponent<Animator> ().Play ("PlayerHurt");		
-		}
+        myRigidBody.linearVelocity = targetVelocity;
+    }
 
-	}
+    private void ResetBoostTime()
+    {
+        if (!rushing)
+        {
+            return;
+        }
 
+        rushTimeLeft -= Time.deltaTime;
 
+        if (rushTimeLeft <= 0f)
+        {
+            rushing = false;
+            rushTimeLeft = 0f;
+        }
+    }
+
+    private void UpdateFacingDirection()
+    {
+        if (horizontalInput > 0.01f)
+        {
+            transform.localScale = new Vector3(spriteScale, spriteScale, spriteScale);
+        }
+        else if (horizontalInput < -0.01f)
+        {
+            transform.localScale = new Vector3(-spriteScale, spriteScale, spriteScale);
+        }
+    }
+
+    private void UpdateAnimatorParameters()
+    {
+        if (myAnim == null || myRigidBody == null)
+        {
+            return;
+        }
+
+        myAnim.SetFloat("Speed", myRigidBody.linearVelocity.magnitude);
+        myAnim.SetFloat("HorizontalSpeed", Mathf.Abs(myRigidBody.linearVelocity.x));
+        myAnim.SetFloat("VerticalSpeed", myRigidBody.linearVelocity.y);
+        myAnim.SetBool("IsRushing", rushing);
+    }
+
+    public void hurt()
+    {
+        if (myAnim == null)
+        {
+            return;
+        }
+
+        if (!rushing)
+        {
+            myAnim.Play("PlayerHurt");
+        }
+    }
 }
